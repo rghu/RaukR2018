@@ -1,0 +1,50 @@
+---
+title: 'Day 1: Markdown Challenge'
+author: "Raghu Chandramohan"
+date: "`r format(Sys.Date(), format = '%d/%m/%Y')`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: kate
+    number_sections: yes
+    theme: flatly
+    toc: yes
+    toc_float: yes
+subtitle: Replicating an existing Markdown file
+editor_options:
+  chunk_output_type: console
+---
+
+#This is a level 1 heading
+This is what comes under level 1
+
+##Now, lets see how level 2 looks!
+Voila! Here is level 2 text!
+
+```{r fig.height = 8, fig.width = 8, }
+plot(cars)
+```
+
+##This mtcars dataset
+
+```{r}
+mtcars
+```
+
+##This is how the data structure looks
+
+```{r}
+str(cars)
+```
+
+##Top 6 entries in dat structure
+
+```{r}
+head(cars)
+```
+
+##Image of Visby
+![Nice view of Visby](../Lab/visby_anim.jpeg)
