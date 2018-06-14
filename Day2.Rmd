@@ -1,0 +1,319 @@
+---
+title: "RaukR Day 2"
+author: "Raghu Chandramohan"
+date: "6/12/2018"
+output: 
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: kate
+    number_sections: yes
+    theme: flatly
+    toc: yes
+    toc_float: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+# Object Oriented Programming in R
+
+## S3 Classes
+
+- what is the class of the object returned by the lm() function? 
+```{r cars}
+x = with(cars, lm(speed ~ dist))
+class(x)
+```
+
+- what basic data type is it build upon?
+```{r}
+typeof(x)
+```
+
+- what attributes does the object of the lm class have?
+```{r}
+attributes(x)
+```
+
+- what is the structure of the lm object?
+```{r}
+str(x)
+```
+
+- does the lm class implement own str()?
+```{r}
+str(x)
+str(unclass(x))
+```
+Both of these are slightly different
+
+- what is the class of a tibble? You have to loadt the tidyverse package and use on of the built-in datasets, e.g. mtcars as argument to as_tibble() to check the class.
+```{r}
+library(tidyverse)
+y = as_tibble(mtcars)
+class(y)
+```
+
+- what is the underlying data type?
+```{r}
+typeof(y)
+```
+
+- is the str() function used by tibbles the default str()?
+```{r}
+str(y)
+str(unclass(y))
+```
+
+- implement your own class meta_frame that is a data.frame with additional attributes:
+  - character attribute descr (a description),
+  - creation attribute whic will hold the creation date.
+  
+```{r}
+meta_frame = function(df, descr, creation){
+  stopifnot(is.data.frame(df), is.character(descr))
+  
+  structure(list(df = df,
+            descr = descr,
+            creation = creation),
+            class = "meta_frame")
+}
+
+z = meta_frame(mtcars, "This is the data", "02-12-2001")
+str(z)
+z$descr
+```
+
+- design implementation of your own S3 class protein that stores the following information (you will implement the class in the next point, now just think and draw on paper if you wish):
+protein sequence,
+protein length,
+post-translational modification (PTM) site coords,
+PTM type that can be either of: “phosphorylation”, or “methylation”.
+- implement the protein class from the previous point using the constructor, validator and helper design pattern. Try to reduce the number of input arguments to: + + asequence and
+a list of PTMs.
+
+The code below is without considering attributes of the object
+```{r}
+protein = function(prot_seq, prot_ptm_coord, prot_ptm_type){
+  structure(list(prot_seq = prot_seq,
+                 prot_len = nchar(prot_seq),
+                 prot_ptm_coord = prot_ptm_coord,
+                 prot_ptm_type = prot_ptm_type),
+            class = "protein")
+}
+
+validate_protein = function(x){
+  prot_seq = x$prot_seq
+  prot_len = x$prot_len
+  prot_ptm_coord = x$prot_ptm_coord
+  prot_ptm_type = x$prot_ptm_type
+  
+  if(prot_len == 0 || !is.numeric(prot_len)){
+    stop("Length of protein is zero or not a number")
+  }
+  if(length(prot_ptm_type) != length(prot_ptm_coord)){
+    stop("Unequal inputs for PTM site and type")
+  }
+}
+
+helper_protein = function(x){
+  prot_seq = x$prot_seq
+  prot_ptm_coord = x$prot_ptm_coord
+  prot_ptm_type = x$prot_ptm_coord
+  validate_protein(protein(prot_seq, prot_ptm_coord, prot_ptm_type))
+}
+```
+
+Here we use consider different details of the proteins as attributes
+```{r}
+protein_construtor = function(protein_seq, prot_length, ptm_coord, ptm_type){
+  stopifnot(is.character(protein_seq))
+  stopifnot(is.numeric(prot_length))
+  stopifnot(is.numeric(ptm_coord))
+  stopifnot(is.character(ptm_type))
+  
+  structure(protein_seq,
+            prot_length = prot_length,
+            ptm_coord = ptm_coord,
+            ptm_type = ptm_type,
+            class = "protein")
+}
+
+protein_helper = function(protein_seq, ptm){
+  protein_len = nchar(protein_seq)
+  ptm_coord = ptm[[1]]
+  ptm_type = ptm[[2]]
+  
+  protein_validator(protein_construtor(protein_seq, protein_len, ptm_coord, ptm_type))
+}
+
+protein_validator <- function(x) {
+  sequence <- unclass(x)
+  len <- attr(x, 'length')
+  ptm_coord <- attr(x, 'ptm_coord')
+  ptm_type <- attr(x, 'ptm_type')
+  if (is.na(sequence)) {
+    stop('Sequence is missing!', call. = FALSE)
+  }
+  if (length(ptm_coord) != length(ptm_type)) {
+    stop('PTM type and site differ in length!', call. = FALSE)
+  }
+  if ((sum(!ptm_type %in% c('phosphorylation', 'methylation'))) > 0) {
+    stop('Invalid PTM types detected!', call. = FALSE)
+  }
+  return(x)
+}
+
+print.protein = function(x){
+  sequence <- unclass(x)
+  len <- attr(x, 'length')
+  ptm_coord <- attr(x, 'ptm_coord')
+  ptm_type <- attr(x, 'ptm_type')
+  
+  print(paste("This is the sequence:", sequence))
+  print(paste("This is the sequence length:", len))
+  print("################################")
+  print(paste("This is the PTM Site:", ptm_coord))
+  print(paste("This is the PTM Type:", ptm_type))
+}
+```
+
+## S4 Classes
+
+- Re-write the protein class in S4 (with validation!).
+
+```{r}
+.protein = setClass(Class = "protein",
+         slots = c(seq = "character",
+                        len = "numeric",
+                        ptm_coord = "numeric",
+                        ptm_type = "character")
+         )
+
+protein = function(seq, ptm){
+  ptm_coord = ptm[[1]]
+  ptm_type = ptm[[2]]
+  len = nchar(seq)
+  
+  if (is.na(seq)) {
+    stop('Sequence is missing!', call. = FALSE)
+  }
+  if (length(ptm_coord) != length(ptm_type)) {
+    stop('PTM type and site differ in length!', call. = FALSE)
+  }
+  if ((sum(!ptm_type %in% c('phosphorylation', 'methylation'))) > 0) {
+    stop('Invalid PTM types detected!', call. = FALSE)
+  }
+  
+  new_protein = .protein(seq = seq, 
+                         len = len, 
+                         ptm_coord = ptm_coord, 
+                         ptm_type = ptm_type)
+  return(new_protein)
+}
+```
+
+- create an S4 object of the protein class and check whether it works.
+```{r}
+my_prot <- protein("DKLLQ", 
+                   list(
+                     site = c(3, 5), 
+                     type = c('phosphorylation', 'methylation')
+                    )
+                  )
+class(my_prot)
+typeof(my_prot)
+str(my_prot)
+```
+
+- implement the generic print using S4 and check that it works.
+```{r}
+print.protein = function(x){
+  seq = x@seq
+  len = x@len
+  ptm_coord = x@ptm_coord
+  ptm_type = x@ptm_type
+  
+  print(paste("This is the sequence:", seq))
+  print(paste("This is the sequence length:", len))
+  print("################################")
+  print(paste("This is the PTM Site:", ptm_coord))
+  print(paste("This is the PTM Type:", ptm_type))
+}
+```
+
+or...
+```{r}
+setMethod("print", "protein", function(x){
+  seq = x@seq
+  len = x@len
+  ptm_coord = x@ptm_coord
+  ptm_type = x@ptm_type
+  
+  print(paste("This is the sequence:", seq))
+  print(paste("This is the sequence length:", len))
+  print("################################")
+  print(paste("This is the PTM Site:", ptm_coord))
+  print(paste("This is the PTM Type:", ptm_type))
+})
+```
+
+- implement a new S4 class ext_protein that extends protein with 3 slots:
+feature type,
+feature position, and
+feature value.
+
+```{r}
+.ext_protein = setClass(Class = "ext_protein",
+                        contains = "protein",
+                        slots = c(protein = "protein",
+                                  feat_type = "character",
+                                  feat_pos = "numeric",
+                                  feat_val = "numeric"))
+
+.ext_protein(my_prot, feat_type = "feature type", feat_pos = 3, feat_val = 10)
+```
+
+## R6 Classes
+
+- install and load the R6 package,
+- implement the protein class using R6 model and check that it works as expected:
+
+```{r}
+library(R6)
+protein = R6Class("protein",
+        public = list(
+          seq = NULL,
+          len = NULL,
+          ptm_coord = NULL,
+          ptm_type = NULL,
+          initialize = function(seq = NA, ptm = NA){
+          self$seq = seq
+          self$len = nchar(seq)
+          self$ptm_coord = ptm[[1]]
+          self$ptm_type = ptm[[2]]
+          
+          stopifnot(is.character(seq))
+          
+          if (is.na(seq)) {
+            stop('Sequence is missing!', call. = FALSE)
+          }
+          if (length(self$ptm_coord) != length(self$ptm_type)) {
+            stop('PTM type and site differ in length!', call. = FALSE)
+          }
+          if ((sum(!self$ptm_type %in% c('phosphorylation', 'methylation'))) > 0) {
+            stop('Invalid PTM types detected!', call. = FALSE)
+          }
+        }
+        )
+)
+
+my_new_prot = protein$new(seq = "ARSXCS", ptm = list(c(1,2), c("phosphorylation", "methylation")))
+str(my_new_prot)
+```
+
+
+
+# R packages Exercise
+
+

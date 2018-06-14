@@ -1,0 +1,457 @@
+---
+title: "Day 3"
+author: "Raghu Chandramohan"
+date: "6/13/2018"
+output: 
+  html_document: 
+    number_sections: yes
+    toc: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Tidyverse
+```{r include=FALSE}
+library(tidyverse)
+library(magrittr)
+```
+
+## General Exercise
+
+### Pipes
+Rewrite the following code chunks as pipes (magrittr):
+
+#### Chunk 1
+```
+my_cars <- mtcars[, c(1:4, 10)]
+my_cars <- my_cars[my_cars$disp > mean(my_cars$disp), ]
+my_cars <- colMeans(my_cars)
+```
+```{r}
+#My solution
+my_cars = as.tibble(mtcars[,c(1:4,10)]) %>% filter(disp > mean(disp)) %>% map(mean)
+# Answer
+mtcars %>% 
+  select(c(1:4, 10)) %>% 
+  filter(disp > mean(disp)) %>% 
+  colMeans() -> my_cars
+```
+
+#### Chunk 2
+The `summary(x)` function is a bit special: when you type `summary(x)` in the console, `print` is called in an implicite way. Pipe call does not do, so you will have to invoke `print` in an explicite way. But the `%T>%` does unbranch for one call only, you will have to make printing of the `summary` a one single composed call using `{}`.
+
+```
+summary(cars)
+colSums(cars)
+```
+```{r}
+#My solution
+cars %T>% {print(summary(.))} %>% colSums()
+```
+
+#### Chunk 3
+```
+cor(mtcars$gear, mtcars$mpg)
+cor(mtcars)
+```
+```{r}
+mtcars %$% cor(gear, mpg)
+mtcars %>% cor()
+#or
+mtcars %>% cor(.,.)
+```
+
+#### Chunk 4
+Given is the `dim_summary(nrows, ncols)` function which takes matrix `nrows` and `ncols` as arguments and prints this info about its dimensions:
+```{r}
+dim_summary <- function(nrows, ncols) {
+  print(
+    paste0('Matrix M has: ', nrows, ' rows and ', ncols, ' columns.')
+  )
+}
+```
+Rewrite the code chunks below as pipes:
+```
+distr1 <- rnorm(16)
+M <- matrix(distr1, ncol = 4)
+plot(M)
+M <- M + sample(M)
+dim_summary(nrows = nrow(M), ncols = ncol(M))
+
+```
+```
+distr2 <- rnorm(16)
+N <- matrix(distr2, ncol = 4)
+colnames(N) = letters[1:4]
+summary(N)
+```
+
+```
+P <- M %x% t(N)
+heatmap(P)
+colnames(P) <- letters[1:dim(P)[2]]
+cor(P[ ,'a'], P[ ,'i'])
+```
+
+```{r}
+M = rnorm(16) %>% matrix(ncol = 4) %T>% plot() %>% `+`(.,sample(.)) %T>% {dim_summary(nrows = nrow(.), ncols = ncol(.))}
+
+N = rnorm(16)  %>% matrix(ncol = 4) %>% `colnames<-`(letters[1:4]) %T>% {print(summary(.))}
+
+M %x% t(N) %T>% 
+  heatmap() %>% `colnames<-`(letters[1:dim(.)[2]]) %>%
+  as.tibble() %$%
+  cor(a,i)
+```
+
+## Tibbles
+
+### Task 1
+- Convert the `mtcars` dataset to a tibble `vehicles`.
+  -  Select the number of cylinders (`cyl`) variable using:
+  -  the `[[index]]` accessor,
+  -  the `[[string]]` accessor,
+  -  the `$` accessor.
+- Do the same selection as above, but using pipe and placeholders (use all thre ways of accessing a variable).
+- Print the tibble.
+- Print the 30 first rows of the tibble.
+- Change the default behaviour of printing a tibble so that at least 15 and at most 30 rows are printed.
+- What is the difference between the `tibble.print_max` and `dplyr.print_min`? Is there any? Test it.
+- Convert `vehicles` back to a `data.frame` called `automobiles`.
+```{r}
+vehicles = as.tibble(mtcars)
+vehicles[[2]]
+vehicles[["cyl"]]
+vehicles$cyl
+```
+```{r}
+X = vehicles %>% 
+  select(cyl) 
+X %>% head(30)
+options(tibble.print_min = 15, tibble.print_max = 30)
+
+automobiles = vehicles %>% as.data.frame()
+```
+
+### Task 2
+```{r}
+tribble(
+  ~id, ~event, ~data,
+  1,	"success",	"24-04-2017",
+  2,	"failed",	"25-04-2017",
+  3,	"failed",	"25-04-2017",
+  4,	"success",	"27-04-2017")
+```
+
+### Task 3
+Compare the performance of `as.data.frame()`, `as_data_frame()` and `as_tibble()` on a 100 x 30 matrix filled with random integers. Use package `microbenchmark`. Fill in your result here in the Tidyverse Lab sheet, Tibbles – performance.
+```{r}
+library(microbenchmark)
+X = sample(1:10, 100*30, replace = T) %>% matrix(ncol = 30)
+microbenchmark(as.data.frame(X))
+microbenchmark(as_data_frame(X))
+microbenchmark(as.tibble(X))
+microbenchmark(as_tibble(X))
+```
+
+### Task 4
+Do you think tibbles are lazy? Try to create a tibble that tests whether lazy evaluation applies to tibbles too.
+```{r}
+tibble(x = sample(1:10, size = 10, replace = T), y = log10(x))
+```
+
+## Parsing
+Parse the following vectors:
+
+- vec1 <- c(1, 7.2, 3.84, -5.23) – parse it as double.
+- now parse the same vector c(1, 7.2, 3.84, -5.23) as integer. What happens?
+- Can you still parse it as integer somehow?
+- Parse as double vec2 <- c('2', '3,45', '?', '-7,28')
+- Parse correctly vec3 <- c('2', '3,45', '?', '-7.28')
+- Parse the following guessing the parser:  vec4 <- c('barrel: 432.7$', 'liter: 15.42PLN', 'gallon costs approx 32.1SEK', 'sunny, wind gusts up till 55m/s')
+- Can you parse vec4 as number? Do it if you can.
+- Parse vec5 <- "25 Dec 2015" as date (hint: ?parse_date()).
+- Parse 10_Jul_1410 as date.
+```{r}
+vec1 = c(1, 7.2, 3.84, -5.23)
+vec2 = c('2', '3,45', '?', '-7,28')
+vec3 = c('2', '3,45', '?', '-7.28')
+vec4 = c('barrel: 432.7$', 'liter: 15.42PLN', 'gallon costs approx 32.1SEK', 'sunny, wind gusts up till 55m/s')
+vec5 = "25 Dec 2015"
+
+parse_double(vec1)
+parse_integer(vec1)
+parse_integer(as.integer(vec1))
+parse_double(vec2, na = "?", locale = locale(decimal_mark = ","))
+parse_number(vec2, na = "?", locale = locale(decimal_mark = ","))
+guess_parser(vec4)
+parse_guess(vec4)
+parse_date(vec5, format = "%d %b %Y")
+parse_date("10_Jul_1410", format = "%d_%b_%Y")
+```
+
+## NYC flights challenge
+The `nycflights13` package contains information about all flights that departed from NYC (i.e., EWR, JFK and LGA) in 2013: 336,776 flights with 16 variables. To help understand what causes delays, it also includes a number of other useful datasets: weather, planes, airports, airlines. We will use it to train working with tibbles and `dplyr`.
+
+```{r include=FALSE}
+library(nycflights13)
+library(dplyr)
+```
+
+### Task 1: Selecting column
+load the nycflights13 package (install if necessary),
+read about the data in the package docs,
+inspect the flights tibble.
+select all columns but carrier and arr_time,
+select carrier, tailnum and origin,
+hide columns from day through carrier,
+select all columns that have to do with arrival (hint: ?tidyselect),
+select columns based on a vector v <- c("arr_time", "sched_arr_time", "arr_delay"),
+rename column dest to destination using:
+select() and
+rename()
+What is the difference between the two approaches?
+```{r}
+flights %>% select(-c(carrier, arr_time)) 
+flights %>% select(carrier, tailnum, origin) 
+flights %>% select(-(day:carrier)) 
+flights %>% select(contains("arr_")) 
+
+v <- c("arr_time", "sched_arr_time", "arr_delay")
+flights %>% select(v)
+
+flights %>% select(destination = dest, everything())
+flights %>% rename(destination = dest)
+```
+
+### Task 2: Filtering rows
+filter only the flights that arrived ahead of schedule,
+filter the flights that had departure delay between 10 and 33,
+fish out all flights with unknown arrival time,
+retrieve rows 1234:1258 (hint: ?slice),
+sample (?sample_n()) 3 random flights per day in March,
+show 5 most departure-delayed flights in January per carrier,
+retrieve all unique() routes and sort them by origin,
+retrieve all distinct() routes and sort them by origin,
+is unique() more efficient than distinct()?
+
+```{r}
+flights %>% filter(arr_delay < 0)
+
+flights %>% filter(dep_delay >= 10 & dep_delay <= 30)
+flights %>% filter(between(dep_delay,10,30)) #alternative
+
+flights %>% filter(is.na(arr_time))
+
+flights %>% slice(1234:1258)
+
+flights %>% filter(near(3, month)) %>% group_by(day) %>% sample_n(3)
+
+flights %>% filter(month == 1) %>% group_by(carrier) %>% top_n(5, dep_delay)
+
+flights %>% mutate(routes = paste0(origin , "_" , dest)) %>% distinct(routes) %>% arrange(routes)
+
+flights %>% mutate(routes = paste0(origin , "_" , dest)) %>% {unique((.)["routes"])} %>% arrange(routes)
+```
+
+### Task 3: Trans(mutations)
+air_time is the amount of time in minutes spent in the air. Add a new column air_spd that will contain aircraft’s airspeed in mph,
+
+as above, but keep only the new air_spd variable,
+
+use rownames_to_column() on mtcars to add car model as an extra column,
+
+```{r}
+flights %>% mutate(air_spd = distance/(air_time/60))
+flights %>% transmute(air_spd = distance/(air_time/60))
+
+mtcars %>% rownames_to_column()
+```
+
+
+### Task 4: Groups and Counts
+use group_by(), summarise() and n() to see how many planes were delayed (departure) every month,
+```{r}
+flights %>% filter(dep_delay > 0) %>% group_by(month) %>% summarise(count_dep_delay = n())
+```
+
+do the same but using tally() and count(),
+```{r}
+flights %>% filter(dep_delay > 0) %>% group_by(month) %>% tally()
+flights %>% filter(dep_delay > 0) %>% count(month)
+```
+what was the mean dep_delay per month?
+```{r}
+flights %>% group_by(month) %>% summarise(mean(dep_delay, na.rm = T))
+```
+
+count the number of incoming delayed flights from each unique origin and sort origins by this count (descending),
+```{r}
+flights %>% filter(arr_delay > 0) %>% group_by(origin) %>% summarise(count = n()) %>% arrange(desc(count))
+```
+
+do the same using tally()
+```{r}
+flights %>% filter(arr_delay > 0) %>% group_by(origin) %>% tally(sort = T)
+```
+
+use summarise() to sum total dep_delay per month in hours,
+```{r}
+flights %>% group_by(month) %>% summarise(sum_dep_delay = sum(dep_delay/60, na.rm = T))
+```
+
+use the wt parameter of count() (works with tally() too) to achieve the same,
+```{r}
+flights %>% group_by(month) %>% count(wt = dep_delay/60)
+```
+
+run group_size() on carrier what does it return?
+```{r}
+flights %>% group_by(carrier) %>% group_size()
+```
+
+use n_groups() to check the number of unique origin-carrier pairs,
+```{r}
+flights %>% group_by(carrier) %>% n_groups()
+```
+
+```
+flights %>% 
+  group_by(origin) %>% 
+  mutate(mean_delay_orig = (mean(dep_delay, na.rm = T) + mean(arr_delay, na.rm = T)) / 2) %>%
+  ungroup() %>%
+  group_by(carrier) %>%
+  mutate(mean_delay_carr = (mean(dep_delay, na.rm = T) + mean(arr_delay, na.rm = T)) / 2) %>%
+  select(origin, carrier, mean_delay_orig, mean_delay_carr)
+```
+
+### Task 5: Joins
+```{r}
+set1 = tribble(~id,	~color,
+"id1",	"grey",
+"id1",	"red",
+"id2",	"green",
+"id3",	"blue")
+
+set2 = tribble(~id,	~color,
+"id1",	"grey",
+"id1",	"red",
+"id2",	"green",
+"id3",	"blue")
+
+left_join(set1, set2)
+right_join(set1, set2)
+inner_join(set1, set2)
+full_join(set1, set2)
+anti_join(set1, set2)
+
+```
+
+## Tidying data
+Now time to do some data tidying. First install a package with some untidy data:
+```{r}
+library(EDAWR)
+EDAWR::cases %>% gather(`2011`, `2012`, `2013`, key = "year", value = "value")
+```
+
+now time for the pollution dataset. Tidy it so that there separate columns for large and small pollution values.
+```{r}
+pollution %>% spread(key = size, value = amount)
+```
+
+the storms dataset contains the date column. Make it into 3 columns: year, month and day. Store the result as tidy_storms
+```{r}
+x = storms %>% separate(date, into = c("Year", "Month", "Day"), sep = "-", convert = T)
+```
+
+now, merge year, month and day in tidy_storms into a date column again but in the “DD/MM/YYYY” format.
+```{r}
+x %>% unite(col = Date, Year, Month, Day, sep = "/" )
+```
+
+# ggplot
+
+
+# ggmap
+As the name suggests, the get_map function from ggmap is used to get maps. The maps are of the class ggmap and you can get many different maptypes.
+
+Use ggmap(), the function, to plot a ggmap object created by get_map and try out a few maptypes.
+Note: Unless you have adjusted ggmap settings with a google API key the get_map seems to be a bit unreliable during testing. If the command fails, try again a few times. Save it to a variable so you don’t have to keep querying the map servers.
+
+```{r}
+library(ggmap)
+map_obj = get_map(location = "Houston", zoom = 10)
+ggmap(map_obj)
+```
+
+Trying out some other maptypes:
+```{r}
+map_obj_water = get_map(location = "Houston", zoom = 10, maptype = "watercolor")
+ggmap(map_obj_water)
+
+map_obj_sat = get_map(location = "Houston", zoom = 10, maptype = "satellite")
+ggmap(map_obj_sat)
+
+map_obj_ton = get_map(location = "Houston", zoom = 10, maptype = "toner-lines")
+map_ton = ggmap(map_obj_ton)
+```
+
+## Add data to the map
+Being able to output maps is great but, as with everything in life, it becomes more interesting when you can overlay it with data.
+
+### Points | geocode() and geom_point()
+ggmap::geocode() is a nifty function that returns the latitude and longitude of a location. Use this to get the geocode of a place within the map that you created earlier in the exercise. Your favourite gym or restaurant for example?
+
+In my example code, I show how to use tibble to get geocodes for several locations and bind them together to a data.frame.
+
+```{r}
+raghu_locations = tibble(location = c("Baylor College of Medicine, Houston"))
+raghu_geo = geocode(raghu_locations$location)
+raghu_places = cbind(raghu_locations, raghu_geo)
+```
+
+When you have your locations dataset ready, use geom_point to add markers to your map for your locations. Feel free to use geom_text to also add labels for your locations. Notice that you can treat the ggmap function like ggplot.
+```{r}
+ggmap(map_obj_water) + 
+  geom_point(data = raghu_places, aes(x = lon, y = lat), color = "black", size = 3) +
+  geom_text(data = raghu_places, aes(label = location), hjust = 0, vjust = -1)
+```
+
+### Routes | trek() and geom_path()
+trek is a function from ggmap that takes a start location and a stop location and gives a list of latitude and longitude coordinates connecting the two. You can give several different modes of transit, but why anyone would choose anything other than bicycling is beyond me.
+
+Combining trek and ggplot2 geom_path we can plot a route between two places, as long as one exists. Regrettably it doesn’t seem like airplane transits are included yet. Read the help page for trek and try it out.
+
+Note: Make sure your background map covers both start and stop position!
+```{r}
+houston_zoomout = get_map(c(lon = -96.5, lat = 29.8), zoom = 8, maptype = "watercolor", scale = 2)
+hou_aus = trek("Houston", "Austin", structure = "route", mode = "driving")
+ggmap(houston_zoomout) +
+  geom_path(aes(x= lon, y = lat), color = "blue", data = hou_aus, size = 2, alpha = 0.5, lineend = "round")
+```
+
+### Pubs
+What do they mean by pubs? Do they mean publications? Nope! We are going to plot actual pubs, bars, inns in the UK using a public dataset from https://www.getthedata.com/open-pubs.
+
+Download the dataset pubs.rda from course materials.
+
+Note: I have processed this data slightly, to see how unhide the following code box.
+
+```{r}
+load("/Users/raghu/Downloads/pubs.rda")
+pubs_tb = as_tibble(pubs)
+pubs_cambridge = pubs_tb %>% filter(city == "Cambridge")
+
+cambrige_map = get_map("Cambrige, UK", zoom = 15, maptype = "toner-lines")
+ggmap(cambrige_map) +
+  geom_point(data = pubs_cambridge, aes(x = longitude, y = latitude), color = "red")
+
+ggmap(cambrige_map) +
+  geom_density_2d(data = pubs_cambridge, aes(x = longitude, y = latitude)) +     stat_density_2d(data = pubs_cambridge, aes(x = longitude, y = latitude,
+    fill = ..level..,alpha = ..level..), geom = "polygon", color = NA)
+```
+
